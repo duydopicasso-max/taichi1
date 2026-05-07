@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
 
 const FinanceContext = createContext();
 
@@ -8,27 +10,32 @@ export const EXPENSE_CATEGORIES = ['Ăn uống', 'Di chuyển', 'Nhà ở', 'Mua
 export const FAMILY_MEMBERS = ['Chung', 'Chồng', 'Vợ', 'Con'];
 
 export function FinanceProvider({ children }) {
-  const [transactions, setTransactions] = useState(() => {
-    const saved = localStorage.getItem('finance_transactions');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    // Mock data for initial empty state
-    return [
-      { id: '1', type: 'income', amount: 20000000, category: 'Lương', member: 'Chồng', date: new Date().toISOString(), note: 'Lương tháng này' },
-      { id: '2', type: 'expense', amount: 500000, category: 'Ăn uống', member: 'Chung', date: new Date().toISOString(), note: 'Đi siêu thị' },
-      { id: '3', type: 'expense', amount: 150000, category: 'Di chuyển', member: 'Vợ', date: new Date(Date.now() - 86400000).toISOString(), note: 'Đổ xăng' }
-    ];
-  });
+  const [transactions, setTransactions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('theme') || 'light';
   });
 
+  // Fetch data from Firebase
   useEffect(() => {
-    localStorage.setItem('finance_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+    const q = query(collection(db, 'transactions'), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setTransactions(data);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching data from Firebase:", error);
+      setIsLoading(false);
+    });
 
+    return () => unsubscribe();
+  }, []);
+
+  // Theme effect
   useEffect(() => {
     localStorage.setItem('theme', theme);
     if (theme === 'dark') {
@@ -42,20 +49,32 @@ export function FinanceProvider({ children }) {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  const addTransaction = (transaction) => {
-    setTransactions(prev => [{
-      ...transaction,
-      id: Date.now().toString(),
-      date: transaction.date || new Date().toISOString()
-    }, ...prev]);
+  const addTransaction = async (transaction) => {
+    try {
+      await addDoc(collection(db, 'transactions'), {
+        ...transaction,
+        date: transaction.date || new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error adding document: ", error);
+    }
   };
 
-  const deleteTransaction = (id) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
+  const deleteTransaction = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'transactions', id));
+    } catch (error) {
+      console.error("Error deleting document: ", error);
+    }
   };
 
-  const updateTransaction = (id, updatedData) => {
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updatedData } : t));
+  const updateTransaction = async (id, updatedData) => {
+    try {
+      await updateDoc(doc(db, 'transactions', id), updatedData);
+    } catch (error) {
+      console.error("Error updating document: ", error);
+    }
   };
 
   // Calculate summaries
@@ -71,6 +90,7 @@ export function FinanceProvider({ children }) {
 
   const value = {
     transactions,
+    isLoading,
     addTransaction,
     deleteTransaction,
     updateTransaction,
