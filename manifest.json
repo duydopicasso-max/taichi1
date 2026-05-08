@@ -1,0 +1,16 @@
+{
+  "short_name": "Nhà Cốm",
+  "name": "Nhà Cốm Say Hi - Tài Chính Gia Đình",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#26c6da",
+  "background_color": "#ffffff"
+}
